@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bible-data = { version = "0.1.0", path = "../bible-data" }
 html-escape = "0.2.13"
 quick-xml = "0.38.4"
 reqwest = {"version" = "0.12.27", "features" = ["blocking"]}
+
+[dev-dependencies]
+insta = { version = "1.45.1", features = ["yaml"] }
