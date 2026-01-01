@@ -45,7 +45,7 @@ fn fetch(book: usize, chapter: usize, version: &str) -> Result<String, Box<dyn E
     Ok(text)
 }
 
-struct BibleGateway;
+pub struct BibleGateway;
 impl BibleGateway {
     pub fn get_chapter_text(
         &self,
@@ -164,8 +164,10 @@ mod tests {
     #[test]
     fn test_get_ge_1() {
         let bg = BibleGateway;
-        let text = bg.get_chapter_text(1, 1, "NIV").unwrap();
-        let lines = text.lines().collect::<Vec<&str>>();
-        insta::assert_yaml_snapshot!(lines);
+        for version in vec!["NIV", "ESV", "KJV", "NASB", "NKJV", "NLT", "HCSB"] {
+            let text = bg.get_chapter_text(1, 1, version).unwrap();
+            let lines = text.lines().collect::<Vec<&str>>();
+            insta::assert_yaml_snapshot!(format!("test_get_ge_1-{}", version), lines);
+        }
     }
 }
