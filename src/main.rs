@@ -1,168 +1,58 @@
-use quick_xml::Reader;
-use quick_xml::events::{BytesStart, Event};
 use reqwest;
-
-fn has_attr(e: &BytesStart, key: &[u8], value: &str) -> bool {
-    let mut found: bool = false;
-    for attr in e.attributes() {
-        let attr = attr.unwrap();
-        if attr.key.as_ref() == key
-            && attr
-                .unescape_value()
-                .unwrap()
-                .split(" ")
-                .any(|x| x == value)
-        {
-            found = true;
-            break;
-        }
-    }
-    found
-}
+use scraper::Node;
+use scraper::{ElementRef, Html, Selector};
 
 fn main() {
     let text =
-        reqwest::blocking::get("https://www.biblegateway.com/passage/?search=ps%20144&version=NIV")
+        reqwest::blocking::get("https://www.biblegateway.com/passage/?search=ge%201&version=KJV")
             .unwrap()
             .text()
             .unwrap();
-    //println!("Response Text: {}", text);
 
-    // Read block <dic class="passage-text">
-    // Split on <sup class="versenum">
-    let mut reader = Reader::from_str(&text);
-    reader.config_mut().trim_text(true);
+    // Parse as HTML
+    let doc = Html::parse_document(&text);
 
-    let mut text: String = String::new();
+    // Get the div containing the text
+    let selector = Selector::parse("div.passage-text").unwrap();
 
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(e)) => match e.name().as_ref() {
-                b"div" if has_attr(&e, b"class", "passage-text") => {
-                    let mut div_depth = 1;
-                    let mut span_depth = 0;
-                    let mut collect_text = false;
-                    let mut in_paragraph = false;
-                    loop {
-                        match reader.read_event() {
-                            Ok(Event::Start(e)) => match e.name().as_ref() {
-                                b"span" if has_attr(&e, b"class", "text") => {
-                                    collect_text = true;
-                                    span_depth = 1;
-                                }
-                                b"span" if has_attr(&e, b"class", "chapternum") => {
-                                    text.push_str("1 ");
-                                    reader.read_to_end(e.name()).unwrap();
-                                }
-                                b"span" if collect_text => {
-                                    span_depth += 1;
-                                }
-                                b"p" => in_paragraph = true,
-                                b"sup" if has_attr(&e, b"class", "versenum") => {
-                                    //println!("{:?}", e);
-                                    if let Ok(Event::Text(e)) = reader.read_event() {
-                                        text.push_str("\n");
-                                        text.push_str(&e.decode().unwrap());
-                                    }
-                                }
-                                b"sup" => {
-                                    reader.read_to_end(e.name()).unwrap();
-                                }
-                                b"div" => {
-                                    //println!("{:?}", e);
-                                    div_depth += 1
-                                }
-                                _ => (),
-                            },
-                            Ok(Event::End(e)) => match e.name().as_ref() {
-                                b"div" => {
-                                    //println!("{:?}", e);
-                                    div_depth -= 1;
-                                    if div_depth == 0 {
-                                        break;
-                                    }
-                                }
-                                b"span" if collect_text => {
-                                    span_depth -= 1;
-                                    if span_depth == 0 {
-                                        collect_text = false;
-                                    }
-                                }
-                                b"p" => in_paragraph = false,
-                                _ => (),
-                            },
-                            Ok(Event::Text(e)) if collect_text && in_paragraph => {
-                                let verse_text = e.decode().unwrap();
-                                if !verse_text.is_empty() {
-                                    // println!("Verse Text: {}", verse_text);
-                                    if !text.ends_with(|c: char| c.is_whitespace())
-                                        && verse_text.starts_with(|c: char| c.is_alphanumeric())
-                                    {
-                                        //println!("[{}] [{}]", text, verse_text);
-                                        text.push_str(" ");
-                                    }
-                                    text.push_str(&verse_text);
-                                }
-                            }
-                            _ => (),
-                        }
+    let div = doc.select(&selector).next().unwrap();
+
+    // Get the paragraphs within this text
+    let selector = Selector::parse("p").unwrap();
+
+    let mut chapter_text: String = String::new();
+
+    for paragraph in div.select(&selector) {
+        // Select all the text spans
+        let selector = Selector::parse("span.text").unwrap();
+        for span in paragraph.select(&selector) {
+            for node in span.children() {
+                let chapter_span = Selector::parse("span.chapternum").unwrap();
+                let verse_sup = Selector::parse("sup.versenum").unwrap();
+                match node.value() {
+                    Node::Text(text) => {
+                        chapter_text.push_str(text);
                     }
-                }
-                _ => (),
-            },
-            Ok(Event::Eof) => break,
-            //Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            _ => (),
-        }
-    }
-    println!("{}", text);
-}
-/*
-*
-
-
-if e.name().as_ref() == b"div" => {
-    for attr in e.attributes() {
-        let attr = attr.unwrap();
-        if attr.key.as_ref() == b"class" && attr.unescape_value().unwrap() == "passage-text" {
-            // Found passage-text div
-            let mut depth = 0;
-            loop {
-                match reader.read_event() {
-                    Ok(Event::Start(ref e)) if e.name().as_ref() == b"sup" => {
-                        let mut sup_text = Cow::Borrowed("");
-                        if let Ok(Event::Text(e)) = reader.read_event() {
-                            sup_text= e.decode().unwrap().to_owned();
-                        }
-                        for attr in e.attributes() {
-                            let attr = attr.unwrap();
-                            if attr.key.as_ref() == b"class" && attr.unescape_value().unwrap() == "versenum" {
-                                // Found versenum sup
-                                    text.push_str("\n");
-                                    text.push_str(&sup_text);
+                    Node::Element(_) => {
+                        if let Some(element) = ElementRef::wrap(node) {
+                            if chapter_span.matches(&element) {
+                                chapter_text.push_str("1 ");
+                            } else if verse_sup.matches(&element) {
+                                chapter_text.push_str("\n");
+                                chapter_text.push_str(
+                                    &element
+                                        .text()
+                                        .next()
+                                        .unwrap()
+                                        .replace(|c: char| c.is_whitespace(), " "),
+                                );
                             }
                         }
                     }
-                    Ok(Event::Text(e)) => {
-                        let verse_text = e.decode().unwrap();
-                        if !verse_text.is_empty() {
-                            // println!("Verse Text: {}", verse_text);
-                            text.push_str(" ");
-                            text.push_str(&verse_text);
-                        }
-                    }
-                    Ok(Event::Start(ref e)) if e.name().as_ref() == b"div" => depth += 1,
-                    Ok(Event::End(ref e)) if e.name().as_ref() == b"div" => {
-                        if depth == 0 {
-                            break;
-                        }
-                        depth -= 1;},
-                    Ok(Event::Eof) => break,
-                    //Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
                     _ => (),
                 }
             }
         }
     }
-},
-*/
+    println!("{}", chapter_text);
+}
