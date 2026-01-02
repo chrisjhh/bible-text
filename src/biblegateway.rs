@@ -1,4 +1,4 @@
-use bible_data::BOOK_ABBREVS;
+use bible_data::{BOOK_ABBREVS, parse_book_abbrev};
 use reqwest;
 use scraper::{ElementRef, Html, Node, Selector};
 use std::error::Error;
@@ -72,6 +72,7 @@ impl GetChapterText for BibleGateway {
         // Parse them once beforehand for efficiency
         let chapter_span = Selector::parse("span.chapternum").unwrap();
         let verse_sup = Selector::parse("sup.versenum").unwrap();
+        let smallcaps_span = Selector::parse("span.small-caps").unwrap();
 
         // Create a mutable string to collect the text we want
         let mut chapter_text: String = String::new();
@@ -83,8 +84,10 @@ impl GetChapterText for BibleGateway {
                 for node in span.children() {
                     match node.value() {
                         Node::Text(text) => {
-                            if chapter_text.ends_with(|c: char| [',', ';', '!'].contains(&c))
-                                && !text.starts_with(|c: char| c.is_whitespace())
+                            if chapter_text.ends_with(|c: char| [',', ';', '!', '.'].contains(&c))
+                                && !text.starts_with(|c: char| {
+                                    c.is_whitespace() || c.is_ascii_punctuation()
+                                })
                             {
                                 chapter_text.push_str(" ");
                             }
@@ -99,8 +102,15 @@ impl GetChapterText for BibleGateway {
                             if let Some(element) = ElementRef::wrap(node) {
                                 if chapter_span.matches(&element) {
                                     chapter_text.push_str("1 ");
+                                } else if smallcaps_span.matches(&element) {
+                                    chapter_text.push_str(
+                                        &element.text().next().unwrap_or("").to_uppercase(),
+                                    );
                                 } else if verse_sup.matches(&element) {
                                     while chapter_text.ends_with(|c: char| c.is_whitespace()) {
+                                        chapter_text.pop();
+                                    }
+                                    if chapter_text == "1" {
                                         chapter_text.pop();
                                     }
                                     if !chapter_text.is_empty() {
@@ -145,5 +155,14 @@ mod tests {
             let lines = text.lines().collect::<Vec<&str>>();
             insta::assert_yaml_snapshot!(format!("test_get_ge_1-{}", version), lines);
         }
+    }
+
+    #[test]
+    fn test_get_hag_2() {
+        let bg = BibleGateway;
+        let book = parse_book_abbrev("Hag").unwrap();
+        let text = bg.get_chapter_text(book + 1, 2, "NIV").unwrap().unwrap();
+        let lines = text.lines().collect::<Vec<&str>>();
+        insta::assert_yaml_snapshot!(lines);
     }
 }

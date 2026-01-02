@@ -7,6 +7,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+#[ignore = "Uses later version of NIV so passages do not match"]
 #[test]
 fn test_biblegateway_NIV() {
     // Get the existing BAR file to the NIV
@@ -44,7 +45,7 @@ fn test_biblegateway_NIV() {
         }
         let bg = BibleGateway;
         let mut fetched_text = bg
-            .get_chapter_text(book_number as usize, chapter_number as usize, "NIV")
+            .get_chapter_text(book_number as usize, chapter_number as usize, "NIVUK")
             .unwrap()
             .unwrap();
 
