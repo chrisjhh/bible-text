@@ -1,8 +1,19 @@
 mod biblegateway;
-use quick_xml::events::BytesStart;
-use std::path::Path;
-use std::{fs, io};
+use std::error::Error;
 
+#[cfg(test)]
+use std::{fs, io, path::Path};
+
+pub trait GetChapterText {
+    fn get_chapter_text(
+        &self,
+        book: usize,
+        chapter: usize,
+        version: &str,
+    ) -> Result<Option<String>, Box<dyn Error>>;
+}
+
+#[cfg(test)]
 fn write_cachefile<P, C>(path: P, contents: C) -> io::Result<()>
 where
     P: AsRef<Path>,
@@ -16,27 +27,10 @@ where
     fs::write(path, contents)
 }
 
+#[cfg(test)]
 fn read_cachefile<P>(path: P) -> io::Result<String>
 where
     P: AsRef<Path>,
 {
     fs::read_to_string(path)
-}
-
-fn has_attr(e: &BytesStart, key: &[u8], value: &str) -> bool {
-    let mut found: bool = false;
-    for attr in e.attributes() {
-        let attr = attr.unwrap();
-        if attr.key.as_ref() == key
-            && attr
-                .unescape_value()
-                .unwrap()
-                .split(" ")
-                .any(|x| x == value)
-        {
-            found = true;
-            break;
-        }
-    }
-    found
 }
