@@ -165,4 +165,13 @@ mod tests {
         let lines = text.lines().collect::<Vec<&str>>();
         insta::assert_yaml_snapshot!(lines);
     }
+
+    #[test]
+    fn test_get_jude() {
+        let bg = BibleGateway;
+        let book = parse_book_abbrev("Jude").unwrap();
+        let text = bg.get_chapter_text(book + 1, 1, "KJV").unwrap().unwrap();
+        let lines = text.lines().collect::<Vec<&str>>();
+        insta::assert_yaml_snapshot!(lines);
+    }
 }
