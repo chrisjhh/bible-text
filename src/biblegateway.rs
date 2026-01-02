@@ -83,8 +83,13 @@ impl GetChapterText for BibleGateway {
                 for node in span.children() {
                     match node.value() {
                         Node::Text(text) => {
-                            if chapter_text.ends_with(|c: char| [',', ';'].contains(&c))
+                            if chapter_text.ends_with(|c: char| [',', ';', '!'].contains(&c))
                                 && !text.starts_with(|c: char| c.is_whitespace())
+                            {
+                                chapter_text.push_str(" ");
+                            }
+                            if chapter_text.ends_with(|c: char| c.is_alphanumeric())
+                                && text.starts_with(|c: char| c.is_alphanumeric())
                             {
                                 chapter_text.push_str(" ");
                             }
@@ -98,7 +103,9 @@ impl GetChapterText for BibleGateway {
                                     while chapter_text.ends_with(|c: char| c.is_whitespace()) {
                                         chapter_text.pop();
                                     }
-                                    chapter_text.push_str("\n");
+                                    if !chapter_text.is_empty() {
+                                        chapter_text.push_str("\n");
+                                    }
                                     chapter_text.push_str(
                                         &element
                                             .text()

@@ -1,4 +1,5 @@
 mod biblegateway;
+pub use biblegateway::BibleGateway;
 use std::error::Error;
 
 #[cfg(test)]
