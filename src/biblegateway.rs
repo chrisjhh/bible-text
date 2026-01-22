@@ -1,4 +1,4 @@
-use bible_data::{BOOK_ABBREVS, parse_book_abbrev};
+use bible_data::{BOOK_ABBREVS, BibleBook};
 use reqwest;
 use scraper::{ElementRef, Html, Node, Selector};
 use std::error::Error;
@@ -77,6 +77,15 @@ impl GetChapterText for BibleGateway {
         // Create a mutable string to collect the text we want
         let mut chapter_text: String = String::new();
 
+        // See if this is a Psalm with a heading
+        if book == BibleBook::Psalms.book_number() as usize {
+            let heading = Selector::parse("*.psalm-title").unwrap();
+            if let Some(elem) = div.select(&heading).next() {
+                elem.text().for_each(|t| chapter_text.push_str(t));
+                chapter_text.push_str("\n");
+            }
+        }
+
         for paragraph in div.select(&selector) {
             // Select all the text spans
             let selector = Selector::parse("span.text").unwrap();
@@ -138,6 +147,7 @@ impl GetChapterText for BibleGateway {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bible_data::parse_book_abbrev;
     use std::path::Path;
 
     #[test]
@@ -171,6 +181,15 @@ mod tests {
         let bg = BibleGateway;
         let book = parse_book_abbrev("Jude").unwrap();
         let text = bg.get_chapter_text(book + 1, 1, "KJV").unwrap().unwrap();
+        let lines = text.lines().collect::<Vec<&str>>();
+        insta::assert_yaml_snapshot!(lines);
+    }
+
+    #[test]
+    fn test_get_psalm_with_intro() {
+        let bg = BibleGateway;
+        let book = parse_book_abbrev("Ps").unwrap();
+        let text = bg.get_chapter_text(book + 1, 140, "ESV").unwrap().unwrap();
         let lines = text.lines().collect::<Vec<&str>>();
         insta::assert_yaml_snapshot!(lines);
     }
