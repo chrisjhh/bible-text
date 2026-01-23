@@ -45,6 +45,67 @@ fn fetch(book: usize, chapter: usize, version: &str) -> Result<String, Box<dyn E
     Ok(text)
 }
 
+fn process_span_element(span: &ElementRef<'_>, chapter_text: &mut String) {
+    // Other selectors we will need within the loop
+    // Parse them once beforehand for efficiency
+    let chapter_span = Selector::parse("span.chapternum").unwrap();
+    let verse_sup = Selector::parse("sup.versenum").unwrap();
+    let smallcaps_span = Selector::parse("span.small-caps").unwrap();
+    let woj_span = Selector::parse("span.woj").unwrap();
+
+    for node in span.children() {
+        match node.value() {
+            Node::Text(text) => {
+                if chapter_text.ends_with(|c: char| {
+                    [',', ';', '!', '.', ':', '?', '”'].contains(&c)
+                }) && !text
+                    .starts_with(|c: char| c.is_whitespace() || ['”', '’'].contains(&c))
+                {
+                    chapter_text.push_str(" ");
+                }
+                if chapter_text.ends_with(|c: char| c.is_alphanumeric())
+                    && text.starts_with(|c: char| c.is_alphanumeric())
+                {
+                    chapter_text.push_str(" ");
+                }
+                chapter_text.push_str(text);
+            }
+            Node::Element(_) => {
+                if let Some(element) = ElementRef::wrap(node) {
+                    if chapter_span.matches(&element) {
+                        chapter_text.push_str("1 ");
+                    } else if smallcaps_span.matches(&element) {
+                        chapter_text.push_str(
+                            &element.text().next().unwrap_or("").to_uppercase(),
+                        );
+                    } else if woj_span.matches(&element) {
+                        // Just take the text of all the direct child text elements
+                        process_span_element(&element, chapter_text);
+                    } else if verse_sup.matches(&element) {
+                        while chapter_text.ends_with(|c: char| c.is_whitespace()) {
+                            chapter_text.pop();
+                        }
+                        if chapter_text == "1" {
+                            chapter_text.pop();
+                        }
+                        if !chapter_text.is_empty() {
+                            chapter_text.push_str("\n");
+                        }
+                        chapter_text.push_str(
+                            &element
+                                .text()
+                                .next()
+                                .unwrap_or("")
+                                .replace(|c: char| c.is_whitespace(), " "),
+                        );
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
 pub struct BibleGateway;
 impl GetChapterText for BibleGateway {
     fn get_chapter_text(
@@ -68,13 +129,6 @@ impl GetChapterText for BibleGateway {
         // Get the paragraphs within this text
         let selector = Selector::parse("p").unwrap();
 
-        // Other selectors we will need within the loop
-        // Parse them once beforehand for efficiency
-        let chapter_span = Selector::parse("span.chapternum").unwrap();
-        let verse_sup = Selector::parse("sup.versenum").unwrap();
-        let smallcaps_span = Selector::parse("span.small-caps").unwrap();
-        let woj_span = Selector::parse("span.woj").unwrap();
-
         // Create a mutable string to collect the text we want
         let mut chapter_text: String = String::new();
 
@@ -91,64 +145,7 @@ impl GetChapterText for BibleGateway {
             // Select all the text spans
             let selector = Selector::parse("span.text").unwrap();
             for span in paragraph.select(&selector) {
-                for node in span.children() {
-                    match node.value() {
-                        Node::Text(text) => {
-                            if chapter_text.ends_with(|c: char| {
-                                [',', ';', '!', '.', ':', '?', '”'].contains(&c)
-                            }) && !text
-                                .starts_with(|c: char| c.is_whitespace() || ['”', '’'].contains(&c))
-                            {
-                                chapter_text.push_str(" ");
-                            }
-                            if chapter_text.ends_with(|c: char| c.is_alphanumeric())
-                                && text.starts_with(|c: char| c.is_alphanumeric())
-                            {
-                                chapter_text.push_str(" ");
-                            }
-                            chapter_text.push_str(text);
-                        }
-                        Node::Element(_) => {
-                            if let Some(element) = ElementRef::wrap(node) {
-                                if chapter_span.matches(&element) {
-                                    chapter_text.push_str("1 ");
-                                } else if smallcaps_span.matches(&element) {
-                                    chapter_text.push_str(
-                                        &element.text().next().unwrap_or("").to_uppercase(),
-                                    );
-                                } else if woj_span.matches(&element) {
-                                    // Just take the text of all the direct child text elements
-                                    element.children().for_each(|node| {
-                                        match node.value() {
-                                            Node::Text(text) => {
-                                                chapter_text.push_str(text);
-                                            },
-                                            _ => (),
-                                        }
-                                    }); 
-                                } else if verse_sup.matches(&element) {
-                                    while chapter_text.ends_with(|c: char| c.is_whitespace()) {
-                                        chapter_text.pop();
-                                    }
-                                    if chapter_text == "1" {
-                                        chapter_text.pop();
-                                    }
-                                    if !chapter_text.is_empty() {
-                                        chapter_text.push_str("\n");
-                                    }
-                                    chapter_text.push_str(
-                                        &element
-                                            .text()
-                                            .next()
-                                            .unwrap_or("")
-                                            .replace(|c: char| c.is_whitespace(), " "),
-                                    );
-                                }
-                            }
-                        }
-                        _ => (),
-                    }
-                }
+                process_span_element(&span, &mut chapter_text);
             }
         }
         Ok(Some(chapter_text))
@@ -210,6 +207,15 @@ mod tests {
         let bg = BibleGateway;
         let book = parse_book_abbrev("Mk").unwrap();
         let text = bg.get_chapter_text(book + 1, 14, "ESV").unwrap().unwrap();
+        let lines = text.lines().collect::<Vec<&str>>();
+        insta::assert_yaml_snapshot!(lines);
+    }
+
+    #[test]
+    fn test_alternate_verse_beginnings() {
+        let bg = BibleGateway;
+        let book = parse_book_abbrev("Mt").unwrap();
+        let text = bg.get_chapter_text(book + 1, 13, "ESV").unwrap().unwrap();
         let lines = text.lines().collect::<Vec<&str>>();
         insta::assert_yaml_snapshot!(lines);
     }
