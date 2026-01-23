@@ -57,7 +57,13 @@ fn test_biblegateway_niv() {
 
         // Compare the two
         let changeset = Changeset::new(&chapter_text, &fetched_text, " ");
-        assert!(chapter_text == fetched_text, "{}", changeset);
+        assert!(
+            chapter_text == fetched_text,
+            "{} {}\n{}",
+            book.book_abbrev(),
+            chapter_number,
+            changeset
+        );
     }
 }
 
@@ -104,13 +110,19 @@ fn test_biblegateway_esv() {
             .unwrap();
 
         // Do some replacements to avoid false positives
-        fetched_text = fetched_text.replace("LORD", "Lord");
+        //fetched_text = fetched_text.replace("LORD", "Lord");
         //fetched_text = fetched_text.replace("—", "--");
         //fetched_text = fetched_text.replace("“", "\"");
         //fetched_text = fetched_text.replace("”", "\"");
 
         // Compare the two
         let changeset = Changeset::new(&chapter_text, &fetched_text, " ");
-        assert!(chapter_text == fetched_text, "{}", changeset);
+        assert!(
+            chapter_text == fetched_text,
+            "{} {}\n{}",
+            book.book_abbrev(),
+            chapter_number,
+            changeset
+        );
     }
 }
