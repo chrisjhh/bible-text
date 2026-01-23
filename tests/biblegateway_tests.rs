@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 #[ignore = "Uses later version of NIV so passages do not match"]
 #[test]
-fn test_biblegateway_NIV() {
+fn test_biblegateway_niv() {
     // Get the existing BAR file to the NIV
     let data_dir = env::var("BAR_DATADIR");
     assert!(
@@ -20,10 +20,10 @@ fn test_biblegateway_NIV() {
     path.push(data_dir.unwrap());
 
     // Get the NIV v1 barfile
-    path.push("NIV_v1.bar");
+    path.push("niv_v1.bar");
     assert!(
         fs::exists(&path).unwrap(),
-        "Cannot find required NIV_v1.bar file in datadir"
+        "Cannot find required niv_v1.bar file in datadir"
     );
 
     let bar = BARFile::open(&path).unwrap();
@@ -63,7 +63,7 @@ fn test_biblegateway_NIV() {
 
 #[ignore = "Some whitespace differences to resolve."]
 #[test]
-fn test_biblegateway_ESV() {
+fn test_biblegateway_esv() {
     // Get the existing BAR file to the NIV
     let data_dir = env::var("BAR_DATADIR");
     assert!(
@@ -74,10 +74,10 @@ fn test_biblegateway_ESV() {
     path.push(data_dir.unwrap());
 
     // Get the NIV v1 barfile
-    path.push("ESV.ibar");
+    path.push("esv.ibar");
     assert!(
         fs::exists(&path).unwrap(),
-        "Cannot find required NIV_v1.bar file in datadir"
+        "Cannot find required esv.ibar file in datadir"
     );
 
     let bar = BARFile::open(&path).unwrap();

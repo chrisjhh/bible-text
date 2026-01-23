@@ -1,6 +1,6 @@
 use bible_data::{BOOK_ABBREVS, BibleBook};
 use reqwest;
-use scraper::{ElementRef, Html, Node, Selector};
+use scraper::{ElementRef, Html, Node, Selector, node};
 use std::error::Error;
 use std::result::Result;
 
@@ -73,6 +73,7 @@ impl GetChapterText for BibleGateway {
         let chapter_span = Selector::parse("span.chapternum").unwrap();
         let verse_sup = Selector::parse("sup.versenum").unwrap();
         let smallcaps_span = Selector::parse("span.small-caps").unwrap();
+        let woj_span = Selector::parse("span.woj").unwrap();
 
         // Create a mutable string to collect the text we want
         let mut chapter_text: String = String::new();
@@ -115,6 +116,16 @@ impl GetChapterText for BibleGateway {
                                     chapter_text.push_str(
                                         &element.text().next().unwrap_or("").to_uppercase(),
                                     );
+                                } else if woj_span.matches(&element) {
+                                    // Just take the text of all the direct child text elements
+                                    element.children().for_each(|node| {
+                                        match node.value() {
+                                            Node::Text(text) => {
+                                                chapter_text.push_str(text);
+                                            },
+                                            _ => (),
+                                        }
+                                    }); 
                                 } else if verse_sup.matches(&element) {
                                     while chapter_text.ends_with(|c: char| c.is_whitespace()) {
                                         chapter_text.pop();
@@ -190,6 +201,15 @@ mod tests {
         let bg = BibleGateway;
         let book = parse_book_abbrev("Ps").unwrap();
         let text = bg.get_chapter_text(book + 1, 140, "ESV").unwrap().unwrap();
+        let lines = text.lines().collect::<Vec<&str>>();
+        insta::assert_yaml_snapshot!(lines);
+    }
+
+    #[test]
+    fn test_words_of_christ() {
+        let bg = BibleGateway;
+        let book = parse_book_abbrev("Mk").unwrap();
+        let text = bg.get_chapter_text(book + 1, 14, "ESV").unwrap().unwrap();
         let lines = text.lines().collect::<Vec<&str>>();
         insta::assert_yaml_snapshot!(lines);
     }
