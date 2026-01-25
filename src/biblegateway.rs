@@ -1,6 +1,6 @@
 use bible_data::{BOOK_ABBREVS, BibleBook};
 use reqwest;
-use scraper::{ElementRef, Html, Node, Selector, node};
+use scraper::{ElementRef, Html, Node, Selector};
 use std::error::Error;
 use std::result::Result;
 
@@ -56,10 +56,9 @@ fn process_span_element(span: &ElementRef<'_>, chapter_text: &mut String) {
     for node in span.children() {
         match node.value() {
             Node::Text(text) => {
-                if chapter_text.ends_with(|c: char| {
-                    [',', ';', '!', '.', ':', '?', '”'].contains(&c)
-                }) && !text
-                    .starts_with(|c: char| c.is_whitespace() || ['”', '’'].contains(&c))
+                if chapter_text
+                    .ends_with(|c: char| [',', ';', '!', '.', ':', '?', '”'].contains(&c))
+                    && !text.starts_with(|c: char| c.is_whitespace() || ['”', '’'].contains(&c))
                 {
                     chapter_text.push_str(" ");
                 }
@@ -75,9 +74,7 @@ fn process_span_element(span: &ElementRef<'_>, chapter_text: &mut String) {
                     if chapter_span.matches(&element) {
                         chapter_text.push_str("1 ");
                     } else if smallcaps_span.matches(&element) {
-                        chapter_text.push_str(
-                            &element.text().next().unwrap_or("").to_uppercase(),
-                        );
+                        chapter_text.push_str(&element.text().next().unwrap_or("").to_uppercase());
                     } else if woj_span.matches(&element) {
                         // Just take the text of all the direct child text elements
                         process_span_element(&element, chapter_text);

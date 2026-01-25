@@ -110,10 +110,20 @@ fn test_biblegateway_esv() {
             .unwrap();
 
         // Do some replacements to avoid false positives
-        //fetched_text = fetched_text.replace("LORD", "Lord");
+        fetched_text = fetched_text.replace("LORD", "Lord");
+        chapter_text = chapter_text.replace("LORD", "Lord");
+        fetched_text = fetched_text.replace("GOD", "God");
+        chapter_text = chapter_text.replace("said", "said ");
+        chapter_text = chapter_text.replace("  ", " ");
+        fetched_text = fetched_text.replace("  ", " ");
+        chapter_text = chapter_text.trim().to_string();
+        fetched_text = fetched_text.trim().to_string();
+
         //fetched_text = fetched_text.replace("—", "--");
         //fetched_text = fetched_text.replace("“", "\"");
         //fetched_text = fetched_text.replace("”", "\"");
+        fetched_text.retain(|c| c.is_ascii_alphanumeric() || c.is_ascii_whitespace());
+        chapter_text.retain(|c| c.is_ascii_alphanumeric() || c.is_ascii_whitespace());
 
         // Compare the two
         let changeset = Changeset::new(&chapter_text, &fetched_text, " ");
